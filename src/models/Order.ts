@@ -9,7 +9,7 @@ export interface IOrderItem {
 }
 
 export interface IOrder extends Document {
- // email: string;
+  email: string;
   items: IOrderItem[];
   customerDetails: {
     firstName: string;
@@ -30,7 +30,7 @@ const OrderItemSchema = new Schema<IOrderItem>({
 });
 
 const OrderSchema: Schema = new Schema<IOrder>({
- // email: { type: String, required: true },
+  email: { type: String, required: true },
   items: [OrderItemSchema],
   customerDetails: {
     firstName: String,
