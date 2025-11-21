@@ -60,12 +60,12 @@ export const createOrder = async (req: Request, res: Response) => {
           price = prod.price;
         }
         total += price * item.quantity;
-        // Use color name from item if provided
+        // Use color name from item
         itemsDetails.push({
           name: prod.name,
           quantity: item.quantity,
           size: item.size,
-          color: item.colorName || item.color, // prefer colorName if present, fallback to color
+          color: item.colorName || item.color || '-', // prefer colorName, fallback to color, then dash
           price,
         });
       }

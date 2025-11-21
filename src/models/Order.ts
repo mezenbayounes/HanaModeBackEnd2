@@ -5,7 +5,9 @@ export interface IOrderItem {
   product: mongoose.Schema.Types.ObjectId | IProduct;
   quantity: number;
   size: string;
-  color?: string; // optional color
+  color?: string; // color code for backward compatibility
+  colorName?: string; // color name
+  colorCode?: string; // color hex code
 }
 
 export interface IOrder extends Document {
@@ -18,7 +20,7 @@ export interface IOrder extends Document {
     phone: string;
   };
   total: number;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'; // new field
+  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   orderDate: Date;
 }
 
@@ -26,7 +28,9 @@ const OrderItemSchema = new Schema<IOrderItem>({
   product: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
   quantity: { type: Number, required: true },
   size: { type: String, required: true },
-  color: { type: String } // optional
+  color: { type: String }, // optional - kept for backward compatibility
+  colorName: { type: String }, // optional color name
+  colorCode: { type: String } // optional color code
 });
 
 const OrderSchema: Schema = new Schema<IOrder>({
