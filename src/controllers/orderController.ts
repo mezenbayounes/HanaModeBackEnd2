@@ -1,3 +1,16 @@
+// Update order status
+export const updateOrderStatus = async (req: Request, res: Response) => {
+  try {
+    const { status } = req.body;
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    order.status = status;
+    await order.save();
+    res.json({ message: 'Order status updated', order });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to update order status', error });
+  }
+};
 import { Request, Response } from 'express';
 import { Order } from '../models/Order';
 import { Product } from '../models/Product';

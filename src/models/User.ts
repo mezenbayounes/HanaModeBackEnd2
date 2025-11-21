@@ -18,6 +18,8 @@ const UserSchema: Schema = new Schema({
     role: { type: String, enum: ['admin', 'user'], default: 'user' },
     favorites: [{ type: Schema.Types.ObjectId, ref: 'Product' }],
     createdAt: { type: Date, default: Date.now },
+    resetPasswordOTP: { type: String },
+    resetPasswordOTPExpires: { type: Date },
 });
 
 export default mongoose.model<IUser>('User', UserSchema);
