@@ -21,6 +21,7 @@ export interface IProduct extends Document {
 
   featured?: boolean;
   bestSeller?: boolean;
+  isHidden?: boolean;
 }
 
 const ColorSchema = new Schema({
@@ -45,7 +46,7 @@ const ProductSchema: Schema = new Schema<IProduct>(
     name: { type: String, required: true },
     category: {
       type: String,
-     
+
       required: true
     },
     description: String,
@@ -63,7 +64,8 @@ const ProductSchema: Schema = new Schema<IProduct>(
     color: [ColorSchema],
 
     featured: Boolean,
-    bestSeller: Boolean
+    bestSeller: Boolean,
+    isHidden: { type: Boolean, default: false }
   },
   { timestamps: true }
 );

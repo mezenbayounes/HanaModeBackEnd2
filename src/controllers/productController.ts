@@ -1,8 +1,15 @@
 import { Request, Response } from 'express';
 import { Product } from '../models/Product';
+import { Order } from '../models/Order';
+import { AuthRequest } from '../middleware/authMiddleware';
 
-export const listProducts = async (req: Request, res: Response) => {
-  const products = await Product.find();
+export const listProducts = async (req: AuthRequest, res: Response) => {
+  // If user is authenticated (admin), show all products
+  // Otherwise, show only non-hidden products
+  const isAdmin = req.user; // req.user is set by auth middleware
+  const filter = isAdmin ? {} : { isHidden: { $ne: true } };
+
+  const products = await Product.find(filter);
   res.json(products);
 };
 
@@ -87,8 +94,26 @@ export const updateProduct = async (req: Request, res: Response) => {
 
 
 export const deleteProduct = async (req: Request, res: Response) => {
-  await Product.findByIdAndDelete(req.params.id);
-  res.json({ message: 'Deleted' });
+  try {
+    const productId = req.params.id;
+
+    // Check if product is used in any orders
+    const ordersWithProduct = await Order.findOne({
+      'items.product': productId
+    });
+
+    if (ordersWithProduct) {
+      return res.status(400).json({
+        error: 'PRODUCT_IN_ORDERS',
+        message: 'Cannot delete product. It is used in one or more orders.'
+      });
+    }
+
+    await Product.findByIdAndDelete(productId);
+    res.json({ message: 'Product deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error deleting product', error });
+  }
 };
 
 export const getProductsByCategory = async (req: Request, res: Response) => {
@@ -104,5 +129,27 @@ export const getProductsByCategory = async (req: Request, res: Response) => {
     res.json(products);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching products by category', error });
+  }
+};
+
+export const toggleProductVisibility = async (req: Request, res: Response) => {
+  try {
+    const productId = req.params.id;
+    const product = await Product.findById(productId);
+
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    // Toggle the isHidden field
+    product.isHidden = !product.isHidden;
+    await product.save();
+
+    res.json({
+      message: `Product ${product.isHidden ? 'hidden' : 'shown'} successfully`,
+      product
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error toggling product visibility', error });
   }
 };
