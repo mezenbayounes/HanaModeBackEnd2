@@ -123,7 +123,7 @@ export const createOrder = async (req: Request, res: Response) => {
     if (order.email) {
       try {
         const info = await transporter.sendMail({
-          from: '"HanaMode" <no-reply@hanamode.com>',
+          from: '"HanaMori" <no-reply@Hanamori.com>',
           to: order.email,
           subject: 'Order Confirmation',
           html: `
@@ -143,23 +143,23 @@ export const createOrder = async (req: Request, res: Response) => {
                 <hr style="margin: 28px 0 18px 0; border: none; border-top: 1px solid #eee;" />
                 <div style="font-size: 15px; color: #555; margin-bottom: 8px;">
                   <strong>Contact us (Aldi):</strong><br />
-                  Email: <a href="mailto:aldi@hanamode.com" style="color:#b48a78;">aldi@hanamode.com</a><br />
+                  Email: <a href="mailto:aldi@hanamori.com" style="color:#b48a78;">aldi@hanamori.com</a><br />
                   Phone: +123-456-7890<br />
-                  Address: 123 HanaMode St, City, Country
+                  Address: 123 HanaMori St, City, Country
                 </div>
               </div>
               <div style="background: #f9f9f9; text-align: center; padding: 28px 0 16px 0; margin-top: 24px; border-top: 1px solid #eee;">
-                <img src="cid:hanamode-logo" alt="HanaMode Logo" style="height: 60px; margin-bottom: 10px;" /><br />
-                <span style="color: #b48a78; font-weight: bold; font-size: 20px; letter-spacing: 1px;">HanaMode</span>
-                <div style="font-size: 13px; color: #888; margin-top: 6px;">&copy; ${new Date().getFullYear()} HanaMode. All rights reserved.</div>
+                <img src="cid:hanamori-logo" alt="HanaMori Logo" style="height: 60px; margin-bottom: 10px;" /><br />
+                <span style="color: #b48a78; font-weight: bold; font-size: 20px; letter-spacing: 1px;">HanaMori</span>
+                <div style="font-size: 13px; color: #888; margin-top: 6px;">&copy; ${new Date().getFullYear()} HanaMori. All rights reserved.</div>
               </div>
             </div>
           `,
           attachments: [
             {
-              filename: 'hanaModeLogo.png',
+              filename: 'hanaMori.png',
               path: __dirname + '/../../assets/hanaModeLogoWhite.png',
-              cid: 'hanamode-logo', // same as in the img src above
+              cid: 'hanamori-logo', // same as in the img src above
             },
           ],
         });
