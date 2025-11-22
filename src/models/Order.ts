@@ -12,6 +12,7 @@ export interface IOrderItem {
 
 export interface IOrder extends Document {
   email: string;
+  userId?: mongoose.Schema.Types.ObjectId; // optional - for logged-in users
   items: IOrderItem[];
   customerDetails: {
     firstName: string;
@@ -35,6 +36,7 @@ const OrderItemSchema = new Schema<IOrderItem>({
 
 const OrderSchema: Schema = new Schema<IOrder>({
   email: { type: String, required: true },
+  userId: { type: Schema.Types.ObjectId, ref: 'User' }, // optional reference to user
   items: [OrderItemSchema],
   customerDetails: {
     firstName: String,

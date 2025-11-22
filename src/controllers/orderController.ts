@@ -27,6 +27,26 @@ export const getOrder = async (req: Request, res: Response) => {
   res.json(order);
 };
 
+// Get orders for a specific user
+export const getUserOrders = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.userId; // from auth middleware
+
+    if (!userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const orders = await Order.find({ userId })
+      .populate('items.product')
+      .sort({ orderDate: -1 }); // newest first
+
+    res.json(orders);
+  } catch (error) {
+    console.error('Error fetching user orders:', error);
+    res.status(500).json({ message: 'Failed to fetch orders', error });
+  }
+};
+
 export const createOrder = async (req: Request, res: Response) => {
   try {
     console.log('--- Incoming order request ---');
@@ -72,10 +92,12 @@ export const createOrder = async (req: Request, res: Response) => {
     }
 
     // 3️⃣ Create and save order
-    // 3️⃣ Create and save order
+    const userId = (req as any).user?.userId; // from auth middleware if logged in
+
     const order = new Order({
       ...req.body,
       email, // always set email at top level for consistency
+      userId: userId || undefined, // save userId if user is logged in
       total,
       status: req.body.status || 'pending', // default pending
     });
