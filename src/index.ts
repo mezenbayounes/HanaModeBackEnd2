@@ -11,13 +11,17 @@ import authRoutes from './routes/authRoutes';
 import favoritesRoutes from './routes/favoritesRoutes';
 import { errorHandler } from './middleware/errorHandler';
 
+import passport from 'passport';
+import './config/passport';
+
 dotenv.config();
 const app = express();
-const port = process.env.PORT || 4000;
+const port = process.env.PORT ;
 
 app.use(cors());
 app.use(morgan('dev'));
 app.use(express.json());
+app.use(passport.initialize());
 
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);

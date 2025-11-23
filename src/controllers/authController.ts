@@ -137,6 +137,10 @@ export const login = async (req: Request, res: Response) => {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
+        if (!user.passwordHash) {
+            return res.status(400).json({ message: 'Invalid credentials' });
+        }
+
         const isMatch = await bcrypt.compare(password, user.passwordHash);
         if (!isMatch) {
             return res.status(400).json({ message: 'Invalid credentials' });
@@ -172,6 +176,10 @@ export const loginAdmin = async (req: Request, res: Response) => {
             return res.status(403).json({ message: 'Access denied: Admins only' });
         }
 
+        if (!user.passwordHash) {
+            return res.status(400).json({ message: 'Invalid credentials' });
+        }
+
         const isMatch = await bcrypt.compare(password, user.passwordHash);
         if (!isMatch) {
             return res.status(400).json({ message: 'Invalid credentials' });
@@ -183,12 +191,42 @@ export const loginAdmin = async (req: Request, res: Response) => {
             { expiresIn: '1d' }
         );
 
-        res.json({ 
-            token, 
-            user: { id: user._id, email: user.email, name: user.name, role: user.role } 
+        res.json({
+            token,
+            user: { id: user._id, email: user.email, name: user.name, role: user.role }
         });
     } catch (error) {
         console.error('Login error:', error);
         res.status(500).json({ message: 'Server error', error });
+    }
+};
+
+export const googleCallback = async (req: Request, res: Response) => {
+    try {
+        const user = req.user as any;
+
+        const token = jwt.sign(
+            { userId: user._id, role: user.role },
+            JWT_SECRET,
+            { expiresIn: '1d' }
+        );
+
+        // Redirect to frontend with token
+        // In production, use environment variable for frontend URL
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+        const userData = JSON.stringify({
+            id: user._id,
+            email: user.email,
+            name: user.name,
+            role: user.role
+        });
+
+        const userBase64 = Buffer.from(userData).toString('base64');
+
+        res.redirect(`${frontendUrl}/auth/google/callback?token=${token}&user=${userBase64}`);
+    } catch (error) {
+        console.error('Google callback error:', error);
+        res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=google_auth_failed`);
     }
 };
