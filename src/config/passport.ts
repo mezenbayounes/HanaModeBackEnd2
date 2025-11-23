@@ -8,7 +8,7 @@ dotenv.config();
 const googleConfig = {
     clientID: process.env.GOOGLE_CLIENT_ID || 'YOUR_GOOGLE_CLIENT_ID',
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'YOUR_GOOGLE_CLIENT_SECRET',
-callbackURL: `${process.env.BASE_URL_BACKEND}/api/auth/google/callback`,
+    callbackURL: `${process.env.BASE_URL_BACKEND}/api/auth/google/callback`,
 };
 
 console.log('Google Strategy Config:', { ...googleConfig, clientSecret: '***' });
@@ -32,6 +32,7 @@ passport.use(
                     if (user) {
                         // Link google account to existing email account
                         user.googleId = profile.id;
+                        user.isVerified = true; // Google verifies email
                         await user.save();
                         return done(null, user);
                     }
@@ -44,6 +45,7 @@ passport.use(
                     name: profile.displayName,
                     role: 'user',
                     favorites: [],
+                    isVerified: true, // Google verifies email
                 });
 
                 await user.save();

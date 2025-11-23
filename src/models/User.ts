@@ -11,6 +11,9 @@ export interface IUser extends Document {
     createdAt: Date;
     resetPasswordOTP?: string;
     resetPasswordOTPExpires?: Date;
+    verificationOTP?: string;
+    verificationOTPExpires?: Date;
+    isVerified: boolean;
 }
 
 const UserSchema: Schema = new Schema({
@@ -24,6 +27,9 @@ const UserSchema: Schema = new Schema({
     createdAt: { type: Date, default: Date.now },
     resetPasswordOTP: { type: String },
     resetPasswordOTPExpires: { type: Date },
+    verificationOTP: { type: String },
+    verificationOTPExpires: { type: Date },
+    isVerified: { type: Boolean, default: false },
 });
 
 export default mongoose.model<IUser>('User', UserSchema);

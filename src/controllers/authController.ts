@@ -96,6 +96,10 @@ export const register = async (req: Request, res: Response) => {
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
 
+        // Generate 6-digit OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 min
+
         const newUser = new User({
             email,
             passwordHash,
@@ -103,23 +107,93 @@ export const register = async (req: Request, res: Response) => {
             address,
             role: role || 'user',
             favorites: [],
+            isVerified: false,
+            verificationOTP: otp,
+            verificationOTPExpires: otpExpires
         });
 
         await newUser.save();
 
+        // Send OTP via email
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: process.env.EMAIL_USER!,
+                pass: process.env.EMAIL_PASS!,
+            },
+        });
+
+        await transporter.sendMail({
+            from: 'HanaMode <no-reply@hanamode.com>',
+            to: email,
+            subject: 'Verify your HanaMode Account',
+            html: `<div style="font-family:Arial,sans-serif;font-size:16px;">
+                <h2 style="color:#b48a78;">Welcome to HanaMode!</h2>
+                <p>Please verify your email address to complete your registration.</p>
+                <p>Your verification code is:</p>
+                <div style="font-size:28px;font-weight:bold;letter-spacing:4px;color:#b48a78;">${otp}</div>
+                <p style="margin-top:12px;">This code will expire in 15 minutes.</p>
+            </div>`
+        });
+
+        res.status(201).json({
+            message: 'Registration successful. Please check your email for verification code.',
+            email: newUser.email,
+            requiresVerification: true
+        });
+    } catch (error) {
+        console.error('Register error:', error);
+        res.status(500).json({ message: 'Server error', error });
+    }
+};
+
+export const verifyEmail = async (req: Request, res: Response) => {
+    try {
+        const { email, otp } = req.body;
+
+        if (!email || !otp) {
+            return res.status(400).json({ message: 'Email and OTP are required' });
+        }
+
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(400).json({ message: 'User not found' });
+        }
+
+        if (user.isVerified) {
+            return res.status(400).json({ message: 'User already verified' });
+        }
+
+        if (!user.verificationOTP || !user.verificationOTPExpires) {
+            return res.status(400).json({ message: 'Invalid verification request' });
+        }
+
+        if (user.verificationOTP !== otp) {
+            return res.status(400).json({ message: 'Invalid OTP' });
+        }
+
+        if (user.verificationOTPExpires < new Date()) {
+            return res.status(400).json({ message: 'OTP expired' });
+        }
+
+        user.isVerified = true;
+        user.verificationOTP = undefined;
+        user.verificationOTPExpires = undefined;
+        await user.save();
+
         const token = jwt.sign(
-            { userId: newUser._id, role: newUser.role },
+            { userId: user._id, role: user.role },
             JWT_SECRET,
             { expiresIn: '1d' }
         );
 
-        res.status(201).json({
-            message: 'User created successfully',
+        res.json({
+            message: 'Email verified successfully',
             token,
-            user: { id: newUser._id, email: newUser.email, name: newUser.name, role: newUser.role }
+            user: { id: user._id, email: user.email, name: user.name, role: user.role }
         });
     } catch (error) {
-        console.error('Register error:', error);
+        console.error('Verification error:', error);
         res.status(500).json({ message: 'Server error', error });
     }
 };
@@ -146,6 +220,10 @@ export const login = async (req: Request, res: Response) => {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
+        if (!user.isVerified) {
+            return res.status(403).json({ message: 'Please verify your email address first', requiresVerification: true, email: user.email });
+        }
+
         const token = jwt.sign(
             { userId: user._id, role: user.role },
             JWT_SECRET,
@@ -158,6 +236,7 @@ export const login = async (req: Request, res: Response) => {
         res.status(500).json({ message: 'Server error', error });
     }
 };
+
 export const loginAdmin = async (req: Request, res: Response) => {
     try {
         const { email, password } = req.body;
@@ -183,6 +262,10 @@ export const loginAdmin = async (req: Request, res: Response) => {
         const isMatch = await bcrypt.compare(password, user.passwordHash);
         if (!isMatch) {
             return res.status(400).json({ message: 'Invalid credentials' });
+        }
+
+        if (!user.isVerified) {
+            return res.status(403).json({ message: 'Please verify your email address first', requiresVerification: true, email: user.email });
         }
 
         const token = jwt.sign(
