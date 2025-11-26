@@ -1,27 +1,65 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import { Model, DataTypes, Optional } from 'sequelize';
+import sequelize from '../db';
 
-export interface IContactMessage extends Document {
+export interface IContactMessage {
+  id: number;
   name: string;
   email: string;
   phone?: string;
   message: string;
   status: 'new' | 'read';
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
-const ContactMessageSchema: Schema = new Schema(
+interface ContactMessageCreationAttributes extends Optional<IContactMessage, 'id' | 'phone' | 'status' | 'createdAt' | 'updatedAt'> { }
+
+class ContactMessage extends Model<IContactMessage, ContactMessageCreationAttributes> implements IContactMessage {
+  public id!: number;
+  public name!: string;
+  public email!: string;
+  public phone?: string;
+  public message!: string;
+  public status!: 'new' | 'read';
+
+  public readonly createdAt!: Date;
+  public readonly updatedAt!: Date;
+}
+
+ContactMessage.init(
   {
-    name: { type: String, required: true },
-    email: { type: String, required: true },
-    phone: String,
-    message: { type: String, required: true },
+    id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      autoIncrement: true,
+      primaryKey: true,
+    },
+    name: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+    },
+    email: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+    },
+    phone: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
+    message: {
+      type: DataTypes.TEXT,
+      allowNull: false,
+    },
     status: {
-      type: String,
-      enum: ['new', 'read'],
-      default: 'new'
-    }
+      type: DataTypes.ENUM('new', 'read'),
+      allowNull: false,
+      defaultValue: 'new',
+    },
   },
-  { timestamps: true }
+  {
+    sequelize,
+    tableName: 'contact_messages',
+    timestamps: true,
+  }
 );
 
-export const ContactMessage = mongoose.model<IContactMessage>('ContactMessage', ContactMessageSchema);
-
+export { ContactMessage };

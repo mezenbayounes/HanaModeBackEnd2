@@ -9,14 +9,12 @@ export const createContactMessage = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Name, email and message are required' });
     }
 
-    const contactMessage = new ContactMessage({
+    const contactMessage = await ContactMessage.create({
       name,
       email,
       phone,
       message
     });
-
-    await contactMessage.save();
 
     res.status(201).json({ message: 'Message received', contactMessage });
   } catch (error) {
@@ -26,10 +24,11 @@ export const createContactMessage = async (req: Request, res: Response) => {
 
 export const listContactMessages = async (_req: Request, res: Response) => {
   try {
-    const messages = await ContactMessage.find().sort({ createdAt: -1 });
+    const messages = await ContactMessage.findAll({
+      order: [['createdAt', 'DESC']]
+    });
     res.json(messages);
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch contact messages', error });
   }
 };
-

@@ -2,21 +2,30 @@ import { Request, Response } from 'express';
 import { Product } from '../models/Product';
 import { Order } from '../models/Order';
 import { AuthRequest } from '../middleware/authMiddleware';
+import { Op } from 'sequelize';
 
 export const listProducts = async (req: AuthRequest, res: Response) => {
-  // If user is authenticated (admin), show all products
-  // Otherwise, show only non-hidden products
-  const isAdmin = req.user; // req.user is set by auth middleware
-  const filter = isAdmin ? {} : { isHidden: { $ne: true } };
+  try {
+    // If user is authenticated (admin), show all products
+    // Otherwise, show only non-hidden products
+    const isAdmin = req.user; // req.user is set by auth middleware
+    const whereClause = isAdmin ? {} : { isHidden: { [Op.ne]: true } };
 
-  const products = await Product.find(filter);
-  res.json(products);
+    const products = await Product.findAll({ where: whereClause });
+    res.json(products);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching products', error });
+  }
 };
 
 export const getProduct = async (req: Request, res: Response) => {
-  const product = await Product.findById(req.params.id);
-  if (!product) return res.status(404).json({ message: 'Not found' });
-  res.json(product);
+  try {
+    const product = await Product.findByPk(req.params.id);
+    if (!product) return res.status(404).json({ message: 'Not found' });
+    res.json(product);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching product', error });
+  }
 };
 
 export const createProduct = async (req: Request, res: Response) => {
@@ -35,14 +44,13 @@ export const createProduct = async (req: Request, res: Response) => {
       color = JSON.parse(color);
     }
 
-    const product = new Product({
+    const product = await Product.create({
       ...req.body,
       sizes,
       color,
       images: imagePaths
     });
 
-    await product.save();
     res.status(201).json({ message: 'Product created successfully', product });
   } catch (error) {
     console.log(error);
@@ -80,11 +88,12 @@ export const updateProduct = async (req: Request, res: Response) => {
     // Remove the existingImages field as it's not part of the schema
     delete updatedData.existingImages;
 
-    const product = await Product.findByIdAndUpdate(
-      req.params.id,
-      updatedData,
-      { new: true }
-    );
+    const product = await Product.findByPk(req.params.id);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    await product.update(updatedData);
 
     res.status(200).json({ message: 'Product updated successfully', product });
   } catch (error) {
@@ -95,12 +104,14 @@ export const updateProduct = async (req: Request, res: Response) => {
 
 export const deleteProduct = async (req: Request, res: Response) => {
   try {
-    const productId = req.params.id;
+    const productId = parseInt(req.params.id);
 
     // Check if product is used in any orders
-    const ordersWithProduct = await Order.findOne({
-      'items.product': productId
-    });
+    // Since items is a JSON field, we need to check all orders
+    const allOrders = await Order.findAll();
+    const ordersWithProduct = allOrders.find(order =>
+      order.items.some((item: any) => item.product === productId)
+    );
 
     if (ordersWithProduct) {
       return res.status(400).json({
@@ -109,7 +120,12 @@ export const deleteProduct = async (req: Request, res: Response) => {
       });
     }
 
-    await Product.findByIdAndDelete(productId);
+    const product = await Product.findByPk(productId);
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    await product.destroy();
     res.json({ message: 'Product deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Error deleting product', error });
@@ -120,7 +136,7 @@ export const getProductsByCategory = async (req: Request, res: Response) => {
   try {
     const { category } = req.params;
 
-    const products = await Product.find({ category });
+    const products = await Product.findAll({ where: { category } });
 
     if (products.length === 0) {
       return res.status(404).json({ message: 'No products found for this category' });
@@ -135,7 +151,7 @@ export const getProductsByCategory = async (req: Request, res: Response) => {
 export const toggleProductVisibility = async (req: Request, res: Response) => {
   try {
     const productId = req.params.id;
-    const product = await Product.findById(productId);
+    const product = await Product.findByPk(productId);
 
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });

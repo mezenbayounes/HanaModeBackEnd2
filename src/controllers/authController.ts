@@ -1,11 +1,220 @@
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
-// POST /api/auth/forgot-password
+import { Request, Response } from 'express';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import User from '../models/User';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
+
+export const register = async (req: Request, res: Response) => {
+    try {
+        const { email, password, name, address, role } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({ message: 'Email and password are required' });
+        }
+
+        const existingUser = await User.findOne({ where: { email } });
+        if (existingUser) {
+            return res.status(400).json({ message: 'User already exists' });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(password, salt);
+
+        // Generate 6-digit OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 min
+
+        const newUser = await User.create({
+            email,
+            passwordHash,
+            name,
+            address,
+            role: role || 'user',
+            favorites: [],
+            isVerified: false,
+            verificationOTP: otp,
+            verificationOTPExpires: otpExpires
+        });
+
+        // Send OTP via email
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: process.env.EMAIL_USER!,
+                pass: process.env.EMAIL_PASS!,
+            },
+        });
+
+        await transporter.sendMail({
+            from: 'HanaMoRI <no-reply@hanamori.com>',
+            to: email,
+            subject: 'Verify your HanaMode Account',
+            html: `<div style="font-family:Arial,sans-serif;font-size:16px;">
+                <h2 style="color:#b48a78;">Welcome to HanaMode!</h2>
+                <p>Please verify your email address to complete your registration.</p>
+                <p>Your verification code is:</p>
+                <div style="font-size:28px;font-weight:bold;letter-spacing:4px;color:#b48a78;">${otp}</div>
+                <p style="margin-top:12px;">This code will expire in 15 minutes.</p>
+            </div>`
+        });
+
+        res.status(201).json({
+            message: 'Registration successful. Please check your email for verification code.',
+            email: newUser.email,
+            requiresVerification: true
+        });
+    } catch (error) {
+        console.error('Register error:', error);
+        res.status(500).json({ message: 'Server error', error });
+    }
+};
+
+export const verifyEmail = async (req: Request, res: Response) => {
+    try {
+        const { email, otp } = req.body;
+
+        if (!email || !otp) {
+            return res.status(400).json({ message: 'Email and OTP are required' });
+        }
+
+        const user = await User.findOne({ where: { email } });
+        if (!user) {
+            return res.status(400).json({ message: 'User not found' });
+        }
+
+        if (user.isVerified) {
+            return res.status(400).json({ message: 'User already verified' });
+        }
+
+        if (!user.verificationOTP || !user.verificationOTPExpires) {
+            return res.status(400).json({ message: 'Invalid verification request' });
+        }
+
+        if (user.verificationOTP !== otp) {
+            return res.status(400).json({ message: 'Invalid OTP' });
+        }
+
+        if (user.verificationOTPExpires < new Date()) {
+            return res.status(400).json({ message: 'OTP expired' });
+        }
+
+        user.isVerified = true;
+        user.verificationOTP = undefined;
+        user.verificationOTPExpires = undefined;
+        await user.save();
+
+        const token = jwt.sign(
+            { userId: user.id, role: user.role },
+            JWT_SECRET,
+            { expiresIn: '1d' }
+        );
+
+        res.json({
+            message: 'Email verified successfully',
+            token,
+            user: { id: user.id, email: user.email, name: user.name, role: user.role }
+        });
+    } catch (error) {
+        console.error('Verification error:', error);
+        res.status(500).json({ message: 'Server error', error });
+    }
+};
+
+export const login = async (req: Request, res: Response) => {
+    try {
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({ message: 'Email and password are required' });
+        }
+
+        const user = await User.findOne({ where: { email } });
+        if (!user) {
+            return res.status(400).json({ message: 'Invalid credentials' });
+        }
+
+        if (!user.passwordHash) {
+            return res.status(400).json({ message: 'Invalid credentials' });
+        }
+
+        const isMatch = await bcrypt.compare(password, user.passwordHash);
+        if (!isMatch) {
+            return res.status(400).json({ message: 'Invalid credentials' });
+        }
+
+        if (!user.isVerified) {
+            return res.status(403).json({ message: 'Please verify your email address first', requiresVerification: true, email: user.email });
+        }
+
+        const token = jwt.sign(
+            { userId: user.id, role: user.role },
+            JWT_SECRET,
+            { expiresIn: '1d' }
+        );
+
+        res.json({ token, user: { id: user.id, email: user.email, name: user.name, role: user.role } });
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({ message: 'Server error', error });
+    }
+};
+
+export const loginAdmin = async (req: Request, res: Response) => {
+    try {
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({ message: 'Email and password are required' });
+        }
+
+        const user = await User.findOne({ where: { email } });
+        if (!user) {
+            return res.status(400).json({ message: 'Invalid credentials' });
+        }
+
+        // Only allow admin
+        if (user.role !== 'admin') {
+            return res.status(403).json({ message: 'Access denied: Admins only' });
+        }
+
+        if (!user.passwordHash) {
+            return res.status(400).json({ message: 'Invalid credentials' });
+        }
+
+        const isMatch = await bcrypt.compare(password, user.passwordHash);
+        if (!isMatch) {
+            return res.status(400).json({ message: 'Invalid credentials' });
+        }
+
+        if (!user.isVerified) {
+            return res.status(403).json({ message: 'Please verify your email address first', requiresVerification: true, email: user.email });
+        }
+
+        const token = jwt.sign(
+            { userId: user.id, role: user.role },
+            JWT_SECRET,
+            { expiresIn: '1d' }
+        );
+
+        res.json({
+            token,
+            user: { id: user.id, email: user.email, name: user.name, role: user.role }
+        });
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({ message: 'Server error', error });
+    }
+};
+
 export const forgotPassword = async (req: Request, res: Response) => {
     try {
         const { email } = req.body;
         if (!email) return res.status(400).json({ message: 'Email is required' });
-        const user = await User.findOne({ email });
+
+        const user = await User.findOne({ where: { email } });
         if (!user) return res.status(404).json({ message: 'User not found' });
 
         // Generate 6-digit OTP
@@ -41,7 +250,6 @@ export const forgotPassword = async (req: Request, res: Response) => {
     }
 };
 
-// POST /api/auth/reset-password
 export const resetPassword = async (req: Request, res: Response) => {
     try {
         const { email, otp, newPassword, confirmPassword } = req.body;
@@ -51,7 +259,8 @@ export const resetPassword = async (req: Request, res: Response) => {
         if (newPassword !== confirmPassword) {
             return res.status(400).json({ message: 'Passwords do not match' });
         }
-        const user = await User.findOne({ email });
+
+        const user = await User.findOne({ where: { email } });
         if (!user || !user.resetPasswordOTP || !user.resetPasswordOTPExpires) {
             return res.status(400).json({ message: 'Invalid or expired OTP' });
         }
@@ -61,225 +270,17 @@ export const resetPassword = async (req: Request, res: Response) => {
         if (user.resetPasswordOTPExpires < new Date()) {
             return res.status(400).json({ message: 'OTP expired' });
         }
+
         // Hash new password
         const salt = await bcrypt.genSalt(10);
         user.passwordHash = await bcrypt.hash(newPassword, salt);
         user.resetPasswordOTP = undefined;
         user.resetPasswordOTPExpires = undefined;
         await user.save();
+
         res.json({ message: 'Password reset successful' });
     } catch (error) {
         console.error('Reset password error:', error);
-        res.status(500).json({ message: 'Server error', error });
-    }
-};
-import { Request, Response } from 'express';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import User from '../models/User';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecretkey';
-
-export const register = async (req: Request, res: Response) => {
-    try {
-        const { email, password, name, address, role } = req.body;
-
-        if (!email || !password) {
-            return res.status(400).json({ message: 'Email and password are required' });
-        }
-
-        const existingUser = await User.findOne({ email });
-        if (existingUser) {
-            return res.status(400).json({ message: 'User already exists' });
-        }
-
-        const salt = await bcrypt.genSalt(10);
-        const passwordHash = await bcrypt.hash(password, salt);
-
-        // Generate 6-digit OTP
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        const otpExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 min
-
-        const newUser = new User({
-            email,
-            passwordHash,
-            name,
-            address,
-            role: role || 'user',
-            favorites: [],
-            isVerified: false,
-            verificationOTP: otp,
-            verificationOTPExpires: otpExpires
-        });
-
-        await newUser.save();
-
-        // Send OTP via email
-        const transporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
-                user: process.env.EMAIL_USER!,
-                pass: process.env.EMAIL_PASS!,
-            },
-        });
-
-        await transporter.sendMail({
-            from: 'HanaMode <no-reply@hanamode.com>',
-            to: email,
-            subject: 'Verify your HanaMode Account',
-            html: `<div style="font-family:Arial,sans-serif;font-size:16px;">
-                <h2 style="color:#b48a78;">Welcome to HanaMode!</h2>
-                <p>Please verify your email address to complete your registration.</p>
-                <p>Your verification code is:</p>
-                <div style="font-size:28px;font-weight:bold;letter-spacing:4px;color:#b48a78;">${otp}</div>
-                <p style="margin-top:12px;">This code will expire in 15 minutes.</p>
-            </div>`
-        });
-
-        res.status(201).json({
-            message: 'Registration successful. Please check your email for verification code.',
-            email: newUser.email,
-            requiresVerification: true
-        });
-    } catch (error) {
-        console.error('Register error:', error);
-        res.status(500).json({ message: 'Server error', error });
-    }
-};
-
-export const verifyEmail = async (req: Request, res: Response) => {
-    try {
-        const { email, otp } = req.body;
-
-        if (!email || !otp) {
-            return res.status(400).json({ message: 'Email and OTP are required' });
-        }
-
-        const user = await User.findOne({ email });
-        if (!user) {
-            return res.status(400).json({ message: 'User not found' });
-        }
-
-        if (user.isVerified) {
-            return res.status(400).json({ message: 'User already verified' });
-        }
-
-        if (!user.verificationOTP || !user.verificationOTPExpires) {
-            return res.status(400).json({ message: 'Invalid verification request' });
-        }
-
-        if (user.verificationOTP !== otp) {
-            return res.status(400).json({ message: 'Invalid OTP' });
-        }
-
-        if (user.verificationOTPExpires < new Date()) {
-            return res.status(400).json({ message: 'OTP expired' });
-        }
-
-        user.isVerified = true;
-        user.verificationOTP = undefined;
-        user.verificationOTPExpires = undefined;
-        await user.save();
-
-        const token = jwt.sign(
-            { userId: user._id, role: user.role },
-            JWT_SECRET,
-            { expiresIn: '1d' }
-        );
-
-        res.json({
-            message: 'Email verified successfully',
-            token,
-            user: { id: user._id, email: user.email, name: user.name, role: user.role }
-        });
-    } catch (error) {
-        console.error('Verification error:', error);
-        res.status(500).json({ message: 'Server error', error });
-    }
-};
-
-export const login = async (req: Request, res: Response) => {
-    try {
-        const { email, password } = req.body;
-
-        if (!email || !password) {
-            return res.status(400).json({ message: 'Email and password are required' });
-        }
-
-        const user = await User.findOne({ email });
-        if (!user) {
-            return res.status(400).json({ message: 'Invalid credentials' });
-        }
-
-        if (!user.passwordHash) {
-            return res.status(400).json({ message: 'Invalid credentials' });
-        }
-
-        const isMatch = await bcrypt.compare(password, user.passwordHash);
-        if (!isMatch) {
-            return res.status(400).json({ message: 'Invalid credentials' });
-        }
-
-        if (!user.isVerified) {
-            return res.status(403).json({ message: 'Please verify your email address first', requiresVerification: true, email: user.email });
-        }
-
-        const token = jwt.sign(
-            { userId: user._id, role: user.role },
-            JWT_SECRET,
-            { expiresIn: '1d' }
-        );
-
-        res.json({ token, user: { id: user._id, email: user.email, name: user.name, role: user.role } });
-    } catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({ message: 'Server error', error });
-    }
-};
-
-export const loginAdmin = async (req: Request, res: Response) => {
-    try {
-        const { email, password } = req.body;
-
-        if (!email || !password) {
-            return res.status(400).json({ message: 'Email and password are required' });
-        }
-
-        const user = await User.findOne({ email });
-        if (!user) {
-            return res.status(400).json({ message: 'Invalid credentials' });
-        }
-
-        // Only allow admin
-        if (user.role !== 'admin') {
-            return res.status(403).json({ message: 'Access denied: Admins only' });
-        }
-
-        if (!user.passwordHash) {
-            return res.status(400).json({ message: 'Invalid credentials' });
-        }
-
-        const isMatch = await bcrypt.compare(password, user.passwordHash);
-        if (!isMatch) {
-            return res.status(400).json({ message: 'Invalid credentials' });
-        }
-
-        if (!user.isVerified) {
-            return res.status(403).json({ message: 'Please verify your email address first', requiresVerification: true, email: user.email });
-        }
-
-        const token = jwt.sign(
-            { userId: user._id, role: user.role },
-            JWT_SECRET,
-            { expiresIn: '1d' }
-        );
-
-        res.json({
-            token,
-            user: { id: user._id, email: user.email, name: user.name, role: user.role }
-        });
-    } catch (error) {
-        console.error('Login error:', error);
         res.status(500).json({ message: 'Server error', error });
     }
 };
@@ -289,7 +290,7 @@ export const googleCallback = async (req: Request, res: Response) => {
         const user = req.user as any;
 
         const token = jwt.sign(
-            { userId: user._id, role: user.role },
+            { userId: user.id, role: user.role },
             JWT_SECRET,
             { expiresIn: '1d' }
         );
@@ -299,7 +300,7 @@ export const googleCallback = async (req: Request, res: Response) => {
         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
         const userData = JSON.stringify({
-            id: user._id,
+            id: user.id,
             email: user.email,
             name: user.name,
             role: user.role

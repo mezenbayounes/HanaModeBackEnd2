@@ -1,35 +1,110 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import { Model, DataTypes, Optional } from 'sequelize';
+import sequelize from '../db';
 
-export interface IUser extends Document {
+export interface IUser {
+    id: number;
     email: string;
-    passwordHash?: string; // Optional for Google OAuth users
-    googleId?: string; // Google OAuth ID
+    passwordHash?: string;
+    googleId?: string;
     name?: string;
     address?: string;
     role: 'admin' | 'user';
-    favorites: mongoose.Types.ObjectId[];
-    createdAt: Date;
+    favorites: number[]; // Array of product IDs
     resetPasswordOTP?: string;
     resetPasswordOTPExpires?: Date;
     verificationOTP?: string;
     verificationOTPExpires?: Date;
     isVerified: boolean;
+    createdAt?: Date;
+    updatedAt?: Date;
 }
 
-const UserSchema: Schema = new Schema({
-    email: { type: String, required: true, unique: true },
-    passwordHash: { type: String }, // Not required for Google OAuth
-    googleId: { type: String }, // Google OAuth ID
-    name: { type: String },
-    address: { type: String },
-    role: { type: String, enum: ['admin', 'user'], default: 'user' },
-    favorites: [{ type: Schema.Types.ObjectId, ref: 'Product' }],
-    createdAt: { type: Date, default: Date.now },
-    resetPasswordOTP: { type: String },
-    resetPasswordOTPExpires: { type: Date },
-    verificationOTP: { type: String },
-    verificationOTPExpires: { type: Date },
-    isVerified: { type: Boolean, default: false },
-});
+interface UserCreationAttributes extends Optional<IUser, 'id' | 'passwordHash' | 'googleId' | 'name' | 'address' | 'favorites' | 'resetPasswordOTP' | 'resetPasswordOTPExpires' | 'verificationOTP' | 'verificationOTPExpires' | 'isVerified' | 'createdAt' | 'updatedAt'> { }
 
-export default mongoose.model<IUser>('User', UserSchema);
+class User extends Model<IUser, UserCreationAttributes> implements IUser {
+    public id!: number;
+    public email!: string;
+    public passwordHash?: string;
+    public googleId?: string;
+    public name?: string;
+    public address?: string;
+    public role!: 'admin' | 'user';
+    public favorites!: number[];
+    public resetPasswordOTP?: string;
+    public resetPasswordOTPExpires?: Date;
+    public verificationOTP?: string;
+    public verificationOTPExpires?: Date;
+    public isVerified!: boolean;
+
+    public readonly createdAt!: Date;
+    public readonly updatedAt!: Date;
+}
+
+User.init(
+    {
+        id: {
+            type: DataTypes.INTEGER.UNSIGNED,
+            autoIncrement: true,
+            primaryKey: true,
+        },
+        email: {
+            type: DataTypes.STRING(255),
+            allowNull: false,
+            unique: true,
+        },
+        passwordHash: {
+            type: DataTypes.STRING(255),
+            allowNull: true,
+        },
+        googleId: {
+            type: DataTypes.STRING(255),
+            allowNull: true,
+        },
+        name: {
+            type: DataTypes.STRING(255),
+            allowNull: true,
+        },
+        address: {
+            type: DataTypes.TEXT,
+            allowNull: true,
+        },
+        role: {
+            type: DataTypes.ENUM('admin', 'user'),
+            allowNull: false,
+            defaultValue: 'user',
+        },
+        favorites: {
+            type: DataTypes.JSON,
+            allowNull: false,
+            defaultValue: [],
+        },
+        resetPasswordOTP: {
+            type: DataTypes.STRING(10),
+            allowNull: true,
+        },
+        resetPasswordOTPExpires: {
+            type: DataTypes.DATE,
+            allowNull: true,
+        },
+        verificationOTP: {
+            type: DataTypes.STRING(10),
+            allowNull: true,
+        },
+        verificationOTPExpires: {
+            type: DataTypes.DATE,
+            allowNull: true,
+        },
+        isVerified: {
+            type: DataTypes.BOOLEAN,
+            allowNull: false,
+            defaultValue: false,
+        },
+    },
+    {
+        sequelize,
+        tableName: 'users',
+        timestamps: true,
+    }
+);
+
+export default User;

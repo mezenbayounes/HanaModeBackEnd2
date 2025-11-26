@@ -1,30 +1,89 @@
-// Update order status
-export const updateOrderStatus = async (req: Request, res: Response) => {
-  try {
-    const { status } = req.body;
-    const order = await Order.findById(req.params.id);
-    if (!order) return res.status(404).json({ message: 'Order not found' });
-    order.status = status;
-    await order.save();
-    res.json({ message: 'Order status updated', order });
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to update order status', error });
-  }
-};
 import { Request, Response } from 'express';
 import { Order } from '../models/Order';
 import { Product } from '../models/Product';
+import User from '../models/User';
 import nodemailer from 'nodemailer';
+import { Op } from 'sequelize';
 
 export const listOrders = async (req: Request, res: Response) => {
-  const orders = await Order.find().populate('items.product');
-  res.json(orders);
+  try {
+    const orders = await Order.findAll({
+      order: [['createdAt', 'DESC']]
+    });
+
+    // Manually populate product data for each order
+    const populatedOrders = await Promise.all(
+      orders.map(async (order) => {
+        const orderData = order.toJSON();
+
+        // Parse items and customerDetails if they're strings
+        const items = typeof orderData.items === 'string' ? JSON.parse(orderData.items) : orderData.items;
+        const customerDetails = typeof orderData.customerDetails === 'string' ? JSON.parse(orderData.customerDetails) : orderData.customerDetails;
+
+        const populatedItems = await Promise.all(
+          items.map(async (item: any) => {
+            const product = await Product.findByPk(item.product);
+            if (product) {
+              const productData = product.toJSON();
+              // Parse product JSON fields
+              return {
+                ...item,
+                product: {
+                  ...productData,
+                  price: typeof productData.price === 'string' ? parseFloat(productData.price) : productData.price,
+                  discountPrice: productData.discountPrice ? (typeof productData.discountPrice === 'string' ? parseFloat(productData.discountPrice) : productData.discountPrice) : undefined,
+                  images: typeof productData.images === 'string' ? JSON.parse(productData.images) : productData.images,
+                  sizes: typeof productData.sizes === 'string' ? JSON.parse(productData.sizes) : productData.sizes,
+                  color: typeof productData.color === 'string' ? JSON.parse(productData.color) : productData.color,
+                }
+              };
+            }
+            return {
+              ...item,
+              product: null
+            };
+          })
+        );
+        return {
+          ...orderData,
+          total: typeof orderData.total === 'string' ? parseFloat(orderData.total) : orderData.total,
+          items: populatedItems,
+          customerDetails
+        };
+      })
+    );
+
+    res.json(populatedOrders);
+  } catch (error) {
+    console.error('Error fetching orders:', error);
+    res.status(500).json({ message: 'Error fetching orders', error });
+  }
 };
 
 export const getOrder = async (req: Request, res: Response) => {
-  const order = await Order.findById(req.params.id).populate('items.product');
-  if (!order) return res.status(404).json({ message: 'Not found' });
-  res.json(order);
+  try {
+    const order = await Order.findByPk(req.params.id);
+    if (!order) return res.status(404).json({ message: 'Not found' });
+
+    // Manually populate product data
+    const orderData = order.toJSON();
+    const populatedItems = await Promise.all(
+      orderData.items.map(async (item: any) => {
+        const product = await Product.findByPk(item.product);
+        return {
+          ...item,
+          product: product ? product.toJSON() : null
+        };
+      })
+    );
+
+    res.json({
+      ...orderData,
+      items: populatedItems
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching order', error });
+  }
 };
 
 // Get orders for a specific user
@@ -36,11 +95,53 @@ export const getUserOrders = async (req: Request, res: Response) => {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const orders = await Order.find({ userId })
-      .populate('items.product')
-      .sort({ orderDate: -1 }); // newest first
+    const orders = await Order.findAll({
+      where: { userId },
+      order: [['orderDate', 'DESC']] // newest first
+    });
 
-    res.json(orders);
+    // Manually populate product data for each order
+    const populatedOrders = await Promise.all(
+      orders.map(async (order) => {
+        const orderData = order.toJSON();
+
+        // Parse items and customerDetails if they're strings
+        const items = typeof orderData.items === 'string' ? JSON.parse(orderData.items) : orderData.items;
+        const customerDetails = typeof orderData.customerDetails === 'string' ? JSON.parse(orderData.customerDetails) : orderData.customerDetails;
+
+        const populatedItems = await Promise.all(
+          items.map(async (item: any) => {
+            const product = await Product.findByPk(item.product);
+            if (product) {
+              const productData = product.toJSON();
+              // Parse product JSON fields
+              return {
+                ...item,
+                product: {
+                  ...productData,
+                  price: typeof productData.price === 'string' ? parseFloat(productData.price) : productData.price,
+                  discountPrice: productData.discountPrice ? (typeof productData.discountPrice === 'string' ? parseFloat(productData.discountPrice) : productData.discountPrice) : undefined,
+                  images: typeof productData.images === 'string' ? JSON.parse(productData.images) : productData.images,
+                  sizes: typeof productData.sizes === 'string' ? JSON.parse(productData.sizes) : productData.sizes,
+                  color: typeof productData.color === 'string' ? JSON.parse(productData.color) : productData.color,
+                }
+              };
+            }
+            return {
+              ...item,
+              product: null
+            };
+          })
+        );
+        return {
+          ...orderData,
+          items: populatedItems,
+          customerDetails
+        };
+      })
+    );
+
+    res.json(populatedOrders);
   } catch (error) {
     console.error('Error fetching user orders:', error);
     res.status(500).json({ message: 'Failed to fetch orders', error });
@@ -70,40 +171,59 @@ export const createOrder = async (req: Request, res: Response) => {
 
     for (const item of req.body.items) {
       console.log('Processing item:', item);
-      const prod = await Product.findById(item.product);
+      const prod = await Product.findByPk(item.product);
       if (!prod) {
         console.error('Product not found for item:', item);
       }
       if (prod) {
-        let price = prod.discountPrice;
-        if (price === undefined || price === null || price === 0) {
-          price = prod.price;
+        // Use discount price only if it's valid (> 0 and less than regular price)
+        let price = prod.price;
+        if (prod.discountPrice && prod.discountPrice > 0 && prod.discountPrice < prod.price) {
+          price = prod.discountPrice;
         }
-        total += price * item.quantity;
+
+        total += Number(price) * item.quantity;
         // Use color name from item
         itemsDetails.push({
           name: prod.name,
           quantity: item.quantity,
           size: item.size,
           color: item.colorName || item.color || '-', // prefer colorName, fallback to color, then dash
-          price,
+          price: Number(price),
         });
       }
     }
 
     // 3️⃣ Create and save order
-    const userId = (req as any).user?.userId; // from auth middleware if logged in
+    const rawUserId = (req as any).user?.userId; // from auth middleware if logged in
 
-    const order = new Order({
+    // Only use userId if it's a valid number AND exists in the users table
+    let userId: number | null = null;
+    if (rawUserId) {
+      const parsedId = typeof rawUserId === 'string' ? parseInt(rawUserId, 10) : rawUserId;
+      if (!isNaN(parsedId) && parsedId > 0) {
+        // Verify user exists in database
+        const userExists = await User.findByPk(parsedId);
+        if (userExists) {
+          userId = parsedId;
+          console.log('Valid userId found:', userId);
+        } else {
+          console.warn('User ID does not exist in database, treating as guest order. UserId:', parsedId);
+        }
+      } else {
+        console.warn('Invalid userId format detected (likely MongoDB ObjectId), treating as guest order:', rawUserId);
+      }
+    }
+
+    const order = await Order.create({
       ...req.body,
       email, // always set email at top level for consistency
-      userId: userId || undefined, // save userId if user is logged in
+      userId, // save userId if valid user exists, otherwise null for guest orders
       total,
       status: req.body.status || 'pending', // default pending
     });
-    await order.save();
 
-    console.log('Order saved:', order);
+    console.log('Order saved:', order.toJSON());
 
     // 4️⃣ Prepare email content
     // Build a modern table for products
@@ -155,7 +275,6 @@ export const createOrder = async (req: Request, res: Response) => {
                 <p style="font-size: 17px; margin: 0 0 8px 0;">Dear Customer,</p>
                 <p style="font-size: 15px; margin: 0 0 18px 0;">We have received your order. Here are the details:</p>
                 <div style="background: #f8f6f4; border-radius: 8px; padding: 16px 20px; margin-bottom: 18px;">
-                  <p style="margin: 0 0 6px 0;"><strong>Order ID:</strong> <span style="color:#b48a78;">${order._id}</span></p>
                   <p style="margin: 0 0 6px 0;"><strong>Total:</strong> <span style="color:#b48a78;">${order.total} DNT</span></p>
                 </div>
                 <div style="margin-bottom: 18px;">
@@ -205,5 +324,21 @@ export const createOrder = async (req: Request, res: Response) => {
       console.error('Error stack:', error.stack);
     }
     res.status(500).json({ message: 'Error creating order', error });
+  }
+};
+
+// Update order status
+export const updateOrderStatus = async (req: Request, res: Response) => {
+  try {
+    const { status } = req.body;
+    const order = await Order.findByPk(req.params.id);
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+
+    order.status = status;
+    await order.save();
+
+    res.json({ message: 'Order status updated', order });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to update order status', error });
   }
 };

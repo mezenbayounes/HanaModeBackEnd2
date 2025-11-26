@@ -1,15 +1,37 @@
-import mongoose from 'mongoose';
+import { Sequelize } from 'sequelize';
 import dotenv from 'dotenv';
 dotenv.config();
 
-const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/HanaMori_db';
+const sequelize = new Sequelize(
+  process.env.DB_NAME || 'HanaMori_db',
+  process.env.DB_USER || 'root',
+  process.env.DB_PASSWORD || '',
+  {
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '3306'),
+    dialect: 'mysql',
+    logging: false, // Set to console.log to see SQL queries
+    pool: {
+      max: 5,
+      min: 0,
+      acquire: 30000,
+      idle: 10000
+    }
+  }
+);
 
 export const connectDB = async () => {
   try {
-    await mongoose.connect(mongoUri);
-    console.log('Connected to MongoDB');
+    await sequelize.authenticate();
+    console.log('Connected to MySQL database');
+
+    // Sync all models with database
+    await sequelize.sync({ alter: true }); // Use alter: true for development, force: false for production
+    console.log('Database synchronized');
   } catch (err) {
-    console.error('MongoDB connection error:', err);
+    console.error('MySQL connection error:', err);
     process.exit(1);
   }
 };
+
+export default sequelize;

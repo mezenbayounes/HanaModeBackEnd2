@@ -19,7 +19,7 @@ passport.use(
         async (accessToken, refreshToken, profile, done) => {
             try {
                 // Check if user already exists
-                let user = await User.findOne({ googleId: profile.id });
+                let user = await User.findOne({ where: { googleId: profile.id } });
 
                 if (user) {
                     return done(null, user);
@@ -28,7 +28,7 @@ passport.use(
                 // Check if user exists with same email
                 const email = profile.emails?.[0]?.value;
                 if (email) {
-                    user = await User.findOne({ email });
+                    user = await User.findOne({ where: { email } });
                     if (user) {
                         // Link google account to existing email account
                         user.googleId = profile.id;
@@ -39,16 +39,19 @@ passport.use(
                 }
 
                 // Create new user
-                user = new User({
+                if (!email) {
+                    return done(new Error('Email not provided by Google'), undefined);
+                }
+
+                user = await User.create({
                     googleId: profile.id,
-                    email: email,
+                    email: email, // Now TypeScript knows email is definitely a string
                     name: profile.displayName,
                     role: 'user',
                     favorites: [],
                     isVerified: true, // Google verifies email
                 });
 
-                await user.save();
                 done(null, user);
             } catch (error) {
                 done(error, undefined);

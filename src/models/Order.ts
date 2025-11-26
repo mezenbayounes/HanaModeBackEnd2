@@ -1,56 +1,98 @@
-import mongoose, { Schema, Document } from 'mongoose';
-import { IProduct } from './Product';
+import { Model, DataTypes, Optional } from 'sequelize';
+import sequelize from '../db';
 
 export interface IOrderItem {
-  product: mongoose.Schema.Types.ObjectId | IProduct;
+  product: number; // Product ID
   quantity: number;
   size: string;
-  color?: string; // color code for backward compatibility
-  colorName?: string; // color name
-  colorCode?: string; // color hex code
+  color?: string;
+  colorName?: string;
+  colorCode?: string;
 }
 
-export interface IOrder extends Document {
+export interface ICustomerDetails {
+  firstName: string;
+  lastName: string;
+  address: string;
+  phone: string;
+}
+
+export interface IOrder {
+  id: number;
   email: string;
-  userId?: mongoose.Schema.Types.ObjectId; // optional - for logged-in users
+  userId?: number;
   items: IOrderItem[];
-  customerDetails: {
-    firstName: string;
-    lastName: string;
-    address: string;
-    phone: string;
-  };
+  customerDetails: ICustomerDetails;
   total: number;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   orderDate: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
-const OrderItemSchema = new Schema<IOrderItem>({
-  product: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
-  quantity: { type: Number, required: true },
-  size: { type: String, required: true },
-  color: { type: String }, // optional - kept for backward compatibility
-  colorName: { type: String }, // optional color name
-  colorCode: { type: String } // optional color code
-});
+interface OrderCreationAttributes extends Optional<IOrder, 'id' | 'userId' | 'status' | 'orderDate' | 'createdAt' | 'updatedAt'> { }
 
-const OrderSchema: Schema = new Schema<IOrder>({
-  email: { type: String, required: true },
-  userId: { type: Schema.Types.ObjectId, ref: 'User' }, // optional reference to user
-  items: [OrderItemSchema],
-  customerDetails: {
-    firstName: String,
-    lastName: String,
-    address: String,
-    phone: String
-  },
-  total: { type: Number, required: true },
-  status: {
-    type: String,
-    enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
-    default: 'pending'
-  },
-  orderDate: { type: Date, default: Date.now }
-}, { timestamps: true });
+class Order extends Model<IOrder, OrderCreationAttributes> implements IOrder {
+  public id!: number;
+  public email!: string;
+  public userId?: number;
+  public items!: IOrderItem[];
+  public customerDetails!: ICustomerDetails;
+  public total!: number;
+  public status!: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  public orderDate!: Date;
 
-export const Order = mongoose.model<IOrder>('Order', OrderSchema);
+  public readonly createdAt!: Date;
+  public readonly updatedAt!: Date;
+}
+
+Order.init(
+  {
+    id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      autoIncrement: true,
+      primaryKey: true,
+    },
+    email: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+    },
+    userId: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      allowNull: true,
+      references: {
+        model: 'users',
+        key: 'id',
+      },
+    },
+    items: {
+      type: DataTypes.JSON,
+      allowNull: false,
+    },
+    customerDetails: {
+      type: DataTypes.JSON,
+      allowNull: false,
+    },
+    total: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+    },
+    status: {
+      type: DataTypes.ENUM('pending', 'processing', 'shipped', 'delivered', 'cancelled'),
+      allowNull: false,
+      defaultValue: 'pending',
+    },
+    orderDate: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
+    },
+  },
+  {
+    sequelize,
+    tableName: 'orders',
+    timestamps: true,
+  }
+);
+
+export { Order };

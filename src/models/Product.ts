@@ -1,6 +1,19 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import { Model, DataTypes, Optional } from 'sequelize';
+import sequelize from '../db';
 
-export interface IProduct extends Document {
+export interface IColor {
+  name: string;
+  code: string;
+}
+
+export interface ISize {
+  size: string;
+  inStock: boolean;
+  colors: IColor[];
+}
+
+export interface IProduct {
+  id: number;
   name: string;
   category: string;
   description: string;
@@ -8,66 +21,101 @@ export interface IProduct extends Document {
   discountPrice?: number;
   inStock: boolean;
   images: string[];
-
-  // UPDATED: size-specific colors
-  sizes: {
-    size: string;
-    inStock: boolean;
-    colors: { name: string; code: string }[];
-  }[];
-
-  // Optional global color list (you can keep or remove)
-  color?: { name: string; code: string }[];
-
+  sizes: ISize[];
+  color?: IColor[];
   featured?: boolean;
   bestSeller?: boolean;
   isHidden?: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
-const ColorSchema = new Schema({
-  name: { type: String, required: true },
-  code: { type: String, required: true }
-});
+interface ProductCreationAttributes extends Optional<IProduct, 'id' | 'discountPrice' | 'color' | 'featured' | 'bestSeller' | 'isHidden' | 'createdAt' | 'updatedAt'> { }
 
-const SizeSchema = new Schema({
-  size: {
-    type: String,
-    required: true
-  },
-  inStock: {
-    type: Boolean,
-    default: true
-  },
-  colors: [ColorSchema] // each size has its own colors
-});
+class Product extends Model<IProduct, ProductCreationAttributes> implements IProduct {
+  public id!: number;
+  public name!: string;
+  public category!: string;
+  public description!: string;
+  public price!: number;
+  public discountPrice?: number;
+  public inStock!: boolean;
+  public images!: string[];
+  public sizes!: ISize[];
+  public color?: IColor[];
+  public featured?: boolean;
+  public bestSeller?: boolean;
+  public isHidden?: boolean;
 
-const ProductSchema: Schema = new Schema<IProduct>(
+  public readonly createdAt!: Date;
+  public readonly updatedAt!: Date;
+}
+
+Product.init(
   {
-    name: { type: String, required: true },
-    category: {
-      type: String,
-
-      required: true
+    id: {
+      type: DataTypes.INTEGER.UNSIGNED,
+      autoIncrement: true,
+      primaryKey: true,
     },
-    description: String,
-
-    price: { type: Number, required: true },
-    discountPrice: Number,
-    inStock: { type: Boolean, default: true },
-
-    images: [String],
-
-    // UPDATED ↓
-    sizes: [SizeSchema],
-
-    // optional global full color list
-    color: [ColorSchema],
-
-    featured: Boolean,
-    bestSeller: Boolean,
-    isHidden: { type: Boolean, default: false }
+    name: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+    },
+    category: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+    },
+    description: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    price: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+    },
+    discountPrice: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+    },
+    inStock: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+    },
+    images: {
+      type: DataTypes.JSON,
+      allowNull: false,
+      defaultValue: [],
+    },
+    sizes: {
+      type: DataTypes.JSON,
+      allowNull: false,
+      defaultValue: [],
+    },
+    color: {
+      type: DataTypes.JSON,
+      allowNull: true,
+    },
+    featured: {
+      type: DataTypes.BOOLEAN,
+      allowNull: true,
+    },
+    bestSeller: {
+      type: DataTypes.BOOLEAN,
+      allowNull: true,
+    },
+    isHidden: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
   },
-  { timestamps: true }
+  {
+    sequelize,
+    tableName: 'products',
+    timestamps: true,
+  }
 );
 
-export const Product = mongoose.model<IProduct>('Product', ProductSchema);
+export { Product };

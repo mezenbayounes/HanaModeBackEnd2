@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { Category } from '../models/Category';
+import { Op } from 'sequelize';
 
 // CREATE category
 export const createCategory = async (req: Request, res: Response) => {
@@ -11,17 +12,16 @@ export const createCategory = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Category name is required' });
     }
 
-    const exists = await Category.findOne({ name });
+    const exists = await Category.findOne({ where: { name } });
     if (exists) return res.status(400).json({ message: 'Category already exists' });
 
     const imagePath = file ? `/uploads/${file.filename}` : image || '';
 
-    const category = new Category({
+    const category = await Category.create({
       name,
       image: imagePath,
       isHidden: isHidden === 'true' || isHidden === true
     });
-    await category.save();
 
     res.status(201).json(category);
   } catch (err) {
@@ -33,8 +33,11 @@ export const createCategory = async (req: Request, res: Response) => {
 export const getCategories = async (req: Request, res: Response) => {
   try {
     const { isAdmin } = req.query;
-    const filter = isAdmin === 'true' ? {} : { isHidden: { $ne: true } };
-    const categories = await Category.find(filter).sort({ createdAt: -1 });
+    const whereClause = isAdmin === 'true' ? {} : { isHidden: { [Op.ne]: true } };
+    const categories = await Category.findAll({
+      where: whereClause,
+      order: [['createdAt', 'DESC']]
+    });
     res.json(categories);
   } catch (err) {
     res.status(500).json({ error: err });
@@ -44,7 +47,7 @@ export const getCategories = async (req: Request, res: Response) => {
 // GET single category
 export const getCategory = async (req: Request, res: Response) => {
   try {
-    const category = await Category.findById(req.params.id);
+    const category = await Category.findByPk(req.params.id);
     if (!category) return res.status(404).json({ message: "Category not found" });
 
     res.json(category);
@@ -72,13 +75,10 @@ export const updateCategory = async (req: Request, res: Response) => {
       updatePayload.isHidden = isHidden === 'true' || isHidden === true;
     }
 
-    const category = await Category.findByIdAndUpdate(
-      req.params.id,
-      updatePayload,
-      { new: true }
-    );
-
+    const category = await Category.findByPk(req.params.id);
     if (!category) return res.status(404).json({ message: 'Category not found' });
+
+    await category.update(updatePayload);
 
     res.json(category);
   } catch (err) {
@@ -89,8 +89,10 @@ export const updateCategory = async (req: Request, res: Response) => {
 // DELETE category
 export const deleteCategory = async (req: Request, res: Response) => {
   try {
-    const category = await Category.findByIdAndDelete(req.params.id);
+    const category = await Category.findByPk(req.params.id);
     if (!category) return res.status(404).json({ message: "Category not found" });
+
+    await category.destroy();
 
     res.json({ message: "Category deleted" });
   } catch (err) {
