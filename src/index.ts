@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import path from 'path';
 import { connectDB } from './db';
 import productRoutes from './routes/productRoutes';
 import orderRoutes from './routes/orderRoutes';
@@ -16,7 +17,7 @@ import './config/passport';
 
 dotenv.config();
 const app = express();
-const port = process.env.PORT ;
+const port = process.env.PORT;
 
 app.use(cors());
 app.use(morgan('dev'));
@@ -25,7 +26,8 @@ app.use(passport.initialize());
 
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
-app.use('/uploads', express.static('uploads'));
+// Serve uploaded files - use absolute path for production
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use('/api/categories', categoryRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/auth', authRoutes);

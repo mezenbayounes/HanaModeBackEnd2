@@ -254,10 +254,12 @@ export const createOrder = async (req: Request, res: Response) => {
 
     // 5️⃣ Setup transporter
     const transporter = nodemailer.createTransport({
-      service: 'gmail',
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.SMTP_PORT || '465'),
+      secure: process.env.SMTP_SECURE === 'true' || true,
       auth: {
-        user: process.env.EMAIL_USER!,
-        pass: process.env.EMAIL_PASS!,
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
       },
     });
 
@@ -265,7 +267,7 @@ export const createOrder = async (req: Request, res: Response) => {
     if (order.email) {
       try {
         const info = await transporter.sendMail({
-          from: '"HanaMori" <no-reply@Hanamori.com>',
+          from: 'HanaMode <contact@hanamode.tn>',
           to: order.email,
           subject: 'Order Confirmation',
           html: `
@@ -284,9 +286,9 @@ export const createOrder = async (req: Request, res: Response) => {
                 <hr style="margin: 28px 0 18px 0; border: none; border-top: 1px solid #eee;" />
                 <div style="font-size: 15px; color: #555; margin-bottom: 8px;">
                   <strong>Contact us (Aldi):</strong><br />
-                  Email: <a href="mailto:aldi@hanamori.com" style="color:#b48a78;">aldi@hanamori.com</a><br />
-                  Phone: +123-456-7890<br />
-                  Address: 123 HanaMori St, City, Country
+                  Email: <a href="mailto:aldi@hanamori.com" style="color:#b48a78;">contact@hanamode.tn</a><br />
+                  Phone: +216 25 524 828<br />
+                  Address: 13 Rue de la Kasabah, Bab Bhar, Tunis
                 </div>
               </div>
               <div style="background: #f9f9f9; text-align: center; padding: 28px 0 16px 0; margin-top: 24px; border-top: 1px solid #eee;">

@@ -32,7 +32,7 @@ Category.init(
     name: {
       type: DataTypes.STRING(255),
       allowNull: false,
-      unique: true,
+
     },
     image: {
       type: DataTypes.STRING(500),
