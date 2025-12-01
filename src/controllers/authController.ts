@@ -354,6 +354,7 @@ export const googleCallback = async (req: Request, res: Response) => {
         res.redirect(`${frontendUrl}/auth/google/callback?token=${token}&user=${userBase64}`);
     } catch (error) {
         console.error('Google callback error:', error);
-        res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=google_auth_failed`);
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        res.redirect(`${frontendUrl}/user-login?error=google_auth_failed`);
     }
 };
