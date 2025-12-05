@@ -99,11 +99,22 @@ const deleteProduct = async (req, res) => {
         // Check if product is used in any orders
         // Since items is a JSON field, we need to check all orders
         const allOrders = await Order_1.Order.findAll();
-        const ordersWithProduct = allOrders.find(order => order.items.some((item) => item.product === productId));
-        if (ordersWithProduct) {
+        const orderWithProduct = allOrders.find(order => {
+            let items = order.items;
+            if (typeof items === 'string') {
+                try {
+                    items = JSON.parse(items);
+                }
+                catch (e) {
+                    return false;
+                }
+            }
+            return Array.isArray(items) && items.some((item) => item.product == productId);
+        });
+        if (orderWithProduct) {
             return res.status(400).json({
                 error: 'PRODUCT_IN_ORDERS',
-                message: 'Cannot delete product. It is used in one or more orders.'
+                message: `Cannot delete product. It is used in order #${orderWithProduct.id || orderWithProduct._id}.`
             });
         }
         const product = await Product_1.Product.findByPk(productId);

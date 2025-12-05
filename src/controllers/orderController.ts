@@ -225,7 +225,7 @@ export const createOrder = async (req: Request, res: Response) => {
 
     console.log('Order saved:', order.toJSON());
 
-    // 4️⃣ Prepare email content
+    // 4️⃣ Prepare email contentm
     // Build a modern table for products
     const itemsHtml = `
       <table style="width:100%; border-collapse:collapse; margin-top:16px;">
@@ -253,6 +253,14 @@ export const createOrder = async (req: Request, res: Response) => {
     `;
 
     // 5️⃣ Setup transporter
+    console.log('=== SMTP Configuration ===');
+    console.log('SMTP_HOST:', process.env.SMTP_HOST || 'smtp.gmail.com');
+    console.log('SMTP_PORT:', process.env.SMTP_PORT || '465');
+    console.log('SMTP_SECURE:', process.env.SMTP_SECURE === 'true' || true);
+    console.log('EMAIL_USER:', process.env.EMAIL_USER);
+    console.log('EMAIL_PASS exists:', !!process.env.EMAIL_PASS);
+    console.log('EMAIL_PASS length:', process.env.EMAIL_PASS?.length || 0);
+
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
       port: parseInt(process.env.SMTP_PORT || '465'),
@@ -261,11 +269,35 @@ export const createOrder = async (req: Request, res: Response) => {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
       },
+      tls: {
+        rejectUnauthorized: false,
+      },
     });
+
+    // 5.5️⃣ Verify SMTP connection
+    console.log('=== Verifying SMTP Connection ===');
+    try {
+      await transporter.verify();
+      console.log('✅ SMTP connection verified successfully');
+    } catch (verifyErr) {
+      console.error('❌ SMTP connection verification failed:', verifyErr);
+      console.error('SMTP verification error details:', {
+        message: verifyErr instanceof Error ? verifyErr.message : String(verifyErr),
+        stack: verifyErr instanceof Error ? verifyErr.stack : undefined,
+      });
+      // Continue anyway, but log the error
+    }
 
     // 6️⃣ Send email safely with logo and contact details
     if (order.email) {
+      console.log('=== Preparing to Send Email ===');
+      console.log('Recipient email:', order.email);
+      console.log('Order ID:', order.id);
+      console.log('Order total:', order.total);
+      console.log('Number of items:', itemsDetails.length);
+
       try {
+        console.log('Calling sendMail...');
         const info = await transporter.sendMail({
           from: 'HanaMode <contact@hanamode.tn>',
           to: order.email,
@@ -285,37 +317,51 @@ export const createOrder = async (req: Request, res: Response) => {
                 </div>
                 <hr style="margin: 28px 0 18px 0; border: none; border-top: 1px solid #eee;" />
                 <div style="font-size: 15px; color: #555; margin-bottom: 8px;">
-                  <strong>Contact us (Aldi):</strong><br />
-                  Email: <a href="mailto:aldi@hanamori.com" style="color:#b48a78;">contact@hanamode.tn</a><br />
+                  <strong>Contact us:</strong><br />
+                  Email: <a href="contact@hanamode.tn" style="color:#b48a78;">contact@hanamode.tn</a><br />
                   Phone: +216 25 524 828<br />
                   Address: 13 Rue de la Kasabah, Bab Bhar, Tunis
                 </div>
               </div>
               <div style="background: #f9f9f9; text-align: center; padding: 28px 0 16px 0; margin-top: 24px; border-top: 1px solid #eee;">
-                <img src="cid:hanamori-logo" alt="HanaMori Logo" style="height: 60px; margin-bottom: 10px;" /><br />
-                <span style="color: #b48a78; font-weight: bold; font-size: 20px; letter-spacing: 1px;">HanaMori</span>
-                <div style="font-size: 13px; color: #888; margin-top: 6px;">&copy; ${new Date().getFullYear()} HanaMori. All rights reserved.</div>
+                <img src="cid:hanamode-logo" alt="HanaMode Logo" style="height: 60px; margin-bottom: 10px;" /><br />
+                <span style="color: #b48a78; font-weight: bold; font-size: 20px; letter-spacing: 1px;">HanaMode</span>
+                <div style="font-size: 13px; color: #888; margin-top: 6px;">&copy; ${new Date().getFullYear()} HanaMode. All rights reserved.</div>
               </div>
             </div>
           `,
           attachments: [
             {
-              filename: 'hanaMori.png',
+              filename: 'hanaMode.png',
               path: __dirname + '/../../assets/hanaModeLogoWhite.png',
-              cid: 'hanamori-logo', // same as in the img src above
+              cid: 'hanamode-logo', // same as in the img src above
             },
           ],
         });
-        console.log('Order confirmation email sent:', info.response);
+
+        console.log('=== Email Send Result ===');
+        console.log('✅ Order confirmation email sent successfully');
+        console.log('Message ID:', info.messageId);
+        console.log('Response:', info.response);
+        console.log('Accepted:', info.accepted);
+        console.log('Rejected:', info.rejected);
+        console.log('Envelope:', JSON.stringify(info.envelope));
+
       } catch (mailErr) {
-        console.error('Error sending order confirmation email, but order was saved:', mailErr);
+        console.error('=== Email Send Error ===');
+        console.error('❌ Error sending order confirmation email, but order was saved');
+        console.error('Error type:', mailErr instanceof Error ? mailErr.constructor.name : typeof mailErr);
+        console.error('Error message:', mailErr instanceof Error ? mailErr.message : String(mailErr));
+        console.error('Error stack:', mailErr instanceof Error ? mailErr.stack : undefined);
+        console.error('Full error object:', JSON.stringify(mailErr, Object.getOwnPropertyNames(mailErr), 2));
         console.log('EMAIL_USER:', process.env.EMAIL_USER);
         console.log('Recipient email:', order.email);
       }
     } else {
+      console.log('=== Email Skipped ===');
       console.log('EMAIL_USER:', process.env.EMAIL_USER);
       console.log('Recipient email:', order.email);
-      console.warn('No email provided, skipping email sending.');
+      console.warn('⚠️ No email provided, skipping email sending.');
     }
 
     // 7️⃣ Respond with the order
