@@ -25,6 +25,13 @@ const connectDB = async () => {
         console.log('Connected to MySQL database');
         // Sync all models with database
         await sequelize.sync({ alter: true }); // Use alter: true for development, force: false for production
+        // Force the auto-increment start value
+        try {
+            await sequelize.query('ALTER TABLE orders AUTO_INCREMENT = 1224884950;');
+        }
+        catch (e) {
+            console.warn('Failed to set initial auto increment (might be ignored if table has data):', e);
+        }
         console.log('Database synchronized');
     }
     catch (err) {

@@ -153,16 +153,10 @@ export const createOrder = async (req: Request, res: Response) => {
     console.log('--- Incoming order request ---');
     console.log('Request body:', JSON.stringify(req.body, null, 2));
 
-    // 1️⃣ Extract email from top-level or customerDetails
+    // 1️⃣ Extract email from top-level or customerDetails (Optional)
     let email = req.body.email;
     if (!email && req.body.customerDetails && req.body.customerDetails.email) {
       email = req.body.customerDetails.email;
-    }
-
-    // 1️⃣ Validate email
-    if (!email) {
-      console.error('Missing email in order request:', req.body);
-      return res.status(400).json({ message: 'Customer email is required' });
     }
 
     // 2️⃣ Calculate total and prepare item details

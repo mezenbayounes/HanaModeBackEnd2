@@ -4,7 +4,7 @@ import sequelize from '../db';
 export interface IContactMessage {
   id: number;
   name: string;
-  email: string;
+  email?: string;
   phone?: string;
   message: string;
   status: 'new' | 'read';
@@ -12,7 +12,7 @@ export interface IContactMessage {
   updatedAt?: Date;
 }
 
-interface ContactMessageCreationAttributes extends Optional<IContactMessage, 'id' | 'phone' | 'status' | 'createdAt' | 'updatedAt'> { }
+interface ContactMessageCreationAttributes extends Optional<IContactMessage, 'id' | 'email' | 'phone' | 'status' | 'createdAt' | 'updatedAt'> { }
 
 class ContactMessage extends Model<IContactMessage, ContactMessageCreationAttributes> implements IContactMessage {
   public id!: number;
@@ -39,7 +39,7 @@ ContactMessage.init(
     },
     email: {
       type: DataTypes.STRING(255),
-      allowNull: false,
+      allowNull: true,
     },
     phone: {
       type: DataTypes.STRING(50),

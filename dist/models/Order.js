@@ -17,7 +17,7 @@ Order.init({
     },
     email: {
         type: sequelize_1.DataTypes.STRING(255),
-        allowNull: false,
+        allowNull: true,
     },
     userId: {
         type: sequelize_1.DataTypes.INTEGER.UNSIGNED,
@@ -53,5 +53,6 @@ Order.init({
     sequelize: db_1.default,
     tableName: 'orders',
     timestamps: true,
+    initialAutoIncrement: '1224884950',
 });
 //# sourceMappingURL=Order.js.map

@@ -19,7 +19,7 @@ export interface ICustomerDetails {
 
 export interface IOrder {
   id: number;
-  email: string;
+  email?: string;
   userId?: number;
   items: IOrderItem[];
   customerDetails: ICustomerDetails;
@@ -30,7 +30,7 @@ export interface IOrder {
   updatedAt?: Date;
 }
 
-interface OrderCreationAttributes extends Optional<IOrder, 'id' | 'userId' | 'status' | 'orderDate' | 'createdAt' | 'updatedAt'> { }
+interface OrderCreationAttributes extends Optional<IOrder, 'id' | 'email' | 'userId' | 'status' | 'orderDate' | 'createdAt' | 'updatedAt'> { }
 
 class Order extends Model<IOrder, OrderCreationAttributes> implements IOrder {
   public id!: number;
@@ -55,7 +55,7 @@ Order.init(
     },
     email: {
       type: DataTypes.STRING(255),
-      allowNull: false,
+      allowNull: true,
     },
     userId: {
       type: DataTypes.INTEGER.UNSIGNED,
@@ -92,6 +92,7 @@ Order.init(
     sequelize,
     tableName: 'orders',
     timestamps: true,
+    initialAutoIncrement: '1224884950',
   }
 );
 

@@ -5,5 +5,6 @@ const contactController_1 = require("../controllers/contactController");
 const router = (0, express_1.Router)();
 router.post('/', contactController_1.createContactMessage);
 router.get('/', contactController_1.listContactMessages);
+router.delete('/:id', contactController_1.deleteContactMessage);
 exports.default = router;
 //# sourceMappingURL=contactRoutes.js.map

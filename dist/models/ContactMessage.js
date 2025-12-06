@@ -21,7 +21,7 @@ ContactMessage.init({
     },
     email: {
         type: sequelize_1.DataTypes.STRING(255),
-        allowNull: false,
+        allowNull: true,
     },
     phone: {
         type: sequelize_1.DataTypes.STRING(50),
